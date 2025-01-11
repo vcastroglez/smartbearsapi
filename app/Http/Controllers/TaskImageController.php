@@ -16,26 +16,46 @@ class TaskImageController extends Controller
 	public function upload(Request $request)
 	{
 		$request->validate([
-			'image' => 'required|image|mimes:jpeg,png,jpg|max:2048'
+			'images.*' => 'required|image|mimes:jpeg,png,jpg|max:2048'
 		]);
 
-		if ($request->hasFile('image')) {
-			// Get the count of existing files in the tasks directory
-			$files = Storage::files('tasks');
-			$fileCount = count($files);
+		$uploadedFiles = [];
+		$errors = [];
 
-			// New file will be number of existing files + 1
-			$newFileName = ($fileCount + 1) . '.png';
+		if ($request->hasFile('images')) {
+			foreach ($request->file('images') as $image) {
+				try {
+					// Get the count of existing files in the tasks directory
+					$files = Storage::files('tasks');
+					$fileCount = count($files);
 
-			// Store the image
-			$request->file('image')->storeAs('tasks', $newFileName);
+					// New file will be number of existing files + 1
+					$newFileName = ($fileCount + 1) . '.png';
 
-			return back()
-				->with('success', 'Image uploaded successfully')
-				->with('image', $newFileName);
+					// Store the image
+					$image->storeAs('tasks', $newFileName);
+
+					$uploadedFiles[] = $newFileName;
+				} catch (\Exception $e) {
+					$errors[] = "Failed to upload image: " . $e->getMessage();
+				}
+			}
 		}
 
-		return back()->with('error', 'Please select an image to upload.');
+		if (count($uploadedFiles) > 0) {
+			return response()->json([
+				'status' => 'success',
+				'message' => count($uploadedFiles) . ' images uploaded successfully',
+				'files' => $uploadedFiles,
+				'errors' => $errors
+			]);
+		}
+
+		return response()->json([
+			'status' => 'error',
+			'message' => 'No images were uploaded',
+			'errors' => $errors
+		], 400);
 	}
 
 	/**
